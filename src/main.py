@@ -7,7 +7,9 @@ def main():
     agent = Agent(client, system_prompt=system_prompt)
     
     # 範例對話
-    user_input = "Does Azure OpenAI support customer managed keys?"
+    # user_input = "Does Azure OpenAI support customer managed keys?"
+    # 範例預設對話
+    user_input = "復學證明可以什麼時候拿到"
     print("用戶:", user_input)
     answer = agent.chat(user_input)
     print("Agent 回答：", answer)

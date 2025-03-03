@@ -169,3 +169,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# google sheet API credentials
+sylvan-journey-452010-m8-cfee3a5341c5.json
