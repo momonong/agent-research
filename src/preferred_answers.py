@@ -19,7 +19,7 @@ def get_preferred_answer(query, google_sheet, threshold=40):
     根據 query 在 preferred_answers 中進行模糊匹配，返回最合適的預設回答。
 
     :param query: 使用者輸入的問題文字
-    :param preferred_answers: 從 Google Sheet 載入的字典列表，每筆記錄應包含 "問題" 與 "AI回覆"
+    :param google_sheet: 從 Google Sheet 載入的字典列表，每筆記錄應包含 "問題" 與 "AI回覆"
     :param threshold: 相似度門檻（0-100），超過此門檻則認為匹配
     :return: 如果有匹配，返回對應的 "AI回覆"，否則返回 None
     """
