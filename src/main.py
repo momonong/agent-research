@@ -1,5 +1,5 @@
 from src.config import init_openai_client
-from src.agent import Agent
+from agents.agent import Agent
 
 def main():
     client = init_openai_client()
