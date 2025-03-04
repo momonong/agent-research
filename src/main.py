@@ -1,5 +1,5 @@
 from src.config import init_openai_client
-from agents.agent import Agent
+from src.agents.agent import Agent
 
 def main():
     client = init_openai_client()
@@ -7,9 +7,9 @@ def main():
     agent = Agent(client, system_prompt=system_prompt)
     
     # 範例對話
-    # user_input = "Does Azure OpenAI support customer managed keys?"
+    user_input = "Does Azure OpenAI support customer managed keys?"
     # 範例預設對話
-    user_input = "復學證明可以什麼時候拿到"
+    # user_input = "復學證明可以什麼時候拿到"
     # user_input = "how to drop out of school"
     # user_input = "is there any scholarships for phd students"
     # user_input = "how to apply for a scholarship"
