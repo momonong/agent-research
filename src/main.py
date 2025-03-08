@@ -1,8 +1,8 @@
-from src.config import init_openai_client
+from src.clients.model_client import init_model_client
 from src.agents.agent import Agent
 
 def main():
-    client = init_openai_client()
+    client = init_model_client()
     system_prompt = "You are a helpful assistant."
     agent = Agent(client, system_prompt=system_prompt)
     
