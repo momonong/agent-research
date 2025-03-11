@@ -1,6 +1,6 @@
 import traceback
 from src.tools.preferred_answers import load_google_sheet, get_preferred_answer
-from src.clients.functions.database_query import handle_function_call
+from src.functions.database_query import handle_function_call
 
 class Agent():
     def __init__(self, client, system_prompt=""):
@@ -27,10 +27,10 @@ class Agent():
         :return: 回答文字
 
         流程：
-          1. 檢查預設回答資料是否匹配，若有則直接返回。
-          2. 若用戶輸入包含關鍵字（例如「復學證明」），則在 API 請求中加入 function calling 的函數定義，
-             讓模型有機會調用 query_database 函數進行模擬資料庫查詢。
-          3. 若模型返回 function_call，則解析並執行對應函數；否則直接返回模型生成的回答。
+            1. 檢查預設回答資料是否匹配，若有則直接返回。
+            2. 若用戶輸入包含關鍵字（例如「復學證明」），則在 API 請求中加入 function calling 的函數定義，
+                讓模型有機會調用 query_database 函數進行模擬資料庫查詢。
+            3. 若模型返回 function_call，則解析並執行對應函數；否則直接返回模型生成的回答。
         """
         # 若有預設回答，則直接回傳
         preferred = get_preferred_answer(query, self.google_sheet)
