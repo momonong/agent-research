@@ -1,9 +1,15 @@
 import traceback
 from src.tools.preferred_answers import load_google_sheet, get_preferred_answer
 from src.functions.database_query import handle_function_call
+from src.agents.function_registry import (
+    get_function_definitions,
+    get_function_call_info,
+)
+from src.functions.web_search import search_web_with_firefox
 
-class Agent():
-    def __init__(self, client, system_prompt=""):
+
+class Agent:
+    def __init__(self, client, system_prompt="", default_source: str = None):
         """
         初始化 Agent，接收 AzureOpenAI 客戶端和可選的 system prompt。
         """
@@ -11,10 +17,12 @@ class Agent():
         self.message = [{"role": "system", "content": system_prompt}]
         # 讀取預設回答資料（從 Google Sheet 載入）
         self.google_sheet = load_google_sheet()
+        # 如果有特定的來源限制，可設置在這裡
+        self.default_source = default_source
 
         if system_prompt:
             self.add_message("system", system_prompt)
-    
+
     def add_message(self, role, content):
         """
         新增對話訊息。
@@ -32,31 +40,15 @@ class Agent():
                 讓模型有機會調用 query_database 函數進行模擬資料庫查詢。
             3. 若模型返回 function_call，則解析並執行對應函數；否則直接返回模型生成的回答。
         """
-        # 若有預設回答，則直接回傳
+        # 1. 嘗試從預設回答中取得答案
         preferred = get_preferred_answer(query, self.google_sheet)
         if preferred:
             self.add_message("assistant", preferred)
             return preferred
 
-        # 判斷是否需要加入 function calling（例如，當查詢包含「復學證明」）
+        # 2. 根據查詢決定是否啟用 function calling
         functions = []
-        if "復學證明" in query:
-            functions = [
-                {
-                    "name": "query_database",
-                    "description": "模擬資料庫查詢，根據查詢 key 返回對應的資料。",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "要查詢的關鍵字，例如 '復學證明'。"
-                            }
-                        },
-                        "required": ["query"]
-                    }
-                }
-            ]
+        functions = get_function_definitions()
 
         try:
             response = self.client.chat.completions.create(
@@ -64,38 +56,41 @@ class Agent():
                 messages=self.message,
                 functions=functions if functions else None,
                 function_call="auto" if functions else None,
-                max_tokens=150,
             )
-            # 如果有 function_call，嘗試處理它
-            if functions:
-                function_result = handle_function_call(response)
-                if function_result is not None:
-                    self.add_message("assistant", str(function_result))
-                    return str(function_result)
-            # 否則，返回模型生成的文字回答
+            # 3. 檢查是否返回了 function_call
+            info = get_function_call_info(response)
+            if info and info["func_name"] == "search_website":
+                query = info["arguments"].get("query", "")
+                # 調用 search_website 函數，注意可傳入 default_source 限定來源
+                result = search_web_with_firefox(query, source_url=self.default_source)
+                self.add_message("assistant", str(result))
+                return str(result)
+
+            # 4. 如果沒有 function_call，則直接返回模型生成的答案
             answer = response.choices[0].message.content
             self.add_message("assistant", answer)
             return answer
+
         except Exception:
             traceback.print_exc()
             return "An error occurred. Please try again."
-        
+
     def chat(self, user_input):
         """
         與使用者對話。
         """
         self.add_message("user", user_input)
         return self.get_response(user_input)
+
+
+if __name__ == "__main__":
+    from src.clients.chat_client import init_chat_model_client
+    client = init_chat_model_client()
+    system_prompt = "你是一個具有函數調用能力的助手，當無法直接回答時會從網路搜尋最新資訊並整合摘要返回。"
+    # 這裡 default_source 可選，若無，則會根據搜尋引擎自動構造 URL（例如 Google 搜尋或 Bing 搜尋）
+    agent = Agent(client, system_prompt=system_prompt, default_source=None)
     
-if __name__ == '__main__':
-    from src.config import init_openai_client
-    client = init_openai_client()
-    print("AzureOpenAI client initialized.")
-    system_prompt = "You are a helpful assistant with function calling capabilities."
-    agent = Agent(client, system_prompt=system_prompt)
-    
-    # 範例對話：查詢「復學證明」的資料
-    user_input = "申請復學的居留簽證的時候，需要的復學證明可以什麼時候拿到"
+    user_input = "請問最新的人工智慧新聞有哪些？"
     print("用戶:", user_input)
     answer = agent.chat(user_input)
     print("Agent 回答：", answer)

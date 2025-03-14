@@ -10,7 +10,7 @@ warnings.filterwarnings(
 config = ScraperConfig()
 
 
-def init_scraper_config() -> dict:
+def init_scraper_client() -> dict:
     """
     使用配置初始化 AzureChatOpenAI 與 OpenAIEmbeddings，返回一個 scraper_config 字典。
     """
@@ -47,5 +47,5 @@ def init_scraper_config() -> dict:
 
 
 if __name__ == "__main__":
-    scraper = init_scraper_config()
+    scraper = init_scraper_client()
     print("Scraper config initialized.")

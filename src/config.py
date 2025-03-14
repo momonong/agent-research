@@ -8,7 +8,7 @@ class ChatModelConfig:
     def __init__(self):
         self.AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
         self.AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-        # self.AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-02-01")
+        self.AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-02-01")
 
 class SheetConfig:
     def __init__(self):

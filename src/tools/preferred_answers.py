@@ -1,6 +1,6 @@
 from rapidfuzz import fuzz
 from dotenv import load_dotenv
-from src.config import init_google_sheet
+from src.clients.sheet_client import init_google_sheet
 
 load_dotenv()
 
