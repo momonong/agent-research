@@ -33,7 +33,7 @@ def get_function_call_info(response) -> dict:
     function_call = response.choices[0].message.function_call
     if not function_call:
         return None
-    print(function_call)
+    
     func_name = function_call.name
     arguments = json.loads(function_call.arguments)
     return {"func_name": func_name, "arguments": arguments}

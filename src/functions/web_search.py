@@ -12,6 +12,9 @@ def search_web_with_firefox(query: str, source_url: str = None) -> list:
         page = browser.new_page(user_agent=user_agent)
 
         if source_url is None:
+            # 確保 query 為字串
+            if not isinstance(query, str):
+                query = str(query)
             encoded_query = urllib.parse.quote_plus(query)
             # 使用 Bing 搜尋 URL
             source_url = f"https://www.bing.com/search?q={encoded_query}"
