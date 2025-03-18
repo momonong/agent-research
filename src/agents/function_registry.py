@@ -1,5 +1,7 @@
 import json
 from src.functions.web_search import search_web_with_firefox
+from src.functions.get_current_time import get_current_time
+from src.functions.summarize_result import summarize_search_sresult
 
 
 def get_function_definitions() -> list:
@@ -19,7 +21,12 @@ def get_function_definitions() -> list:
                 },
                 "required": ["query"],
             },
-        }
+        },
+        {
+            "name": "get_current_time",
+            "description": "返回當前系統時間。",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
     ]
 
 
@@ -33,28 +40,62 @@ def get_function_call_info(response) -> dict:
     function_call = response.choices[0].message.function_call
     if not function_call:
         return None
-    
+
     func_name = function_call.name
     arguments = json.loads(function_call.arguments)
     return {"func_name": func_name, "arguments": arguments}
 
 
-def handle_function_call(response, default_source: str = None) -> str:
+def handle_function_call(step, response, chain_of_thought, default_source: str = None):
     """
     處理模型返回的 function_call 回應：
     如果函數名稱為 "search_website"，則調用 search_web_with_firefox 並返回結果。
     """
-    function_call_info = get_function_call_info(response)
-    if not function_call_info:
+    info = get_function_call_info(response)
+    if not info:
         return None
 
-    if function_call_info["name"] == "search_website":
-        query = function_call_info.get("query", "")
-        # 這裡我們使用預設的來源 URL（或 default_source，如果有提供）
-        return (
-            search_web_with_firefox(query, source_url=default_source)[0]["title"]
-            if search_web_with_firefox(query, source_url=default_source)
-            else "無搜尋結果"
+    # 處理搜尋功能
+    if info["func_name"] == "search_website":
+        step += 1
+        chain_of_thought.append(
+            f"Step {step}: 模型返回 function_call，準備執行 'search_website'，參數："
+            + json.dumps(info["arguments"])
         )
+        yield {
+            "role": "system",
+            "content": f"Step {step}: 模型返回 function_call，執行搜尋功能。",
+        }
+        query_arg = info["arguments"].get("query", "")
+        # 呼叫搜尋函數取得原始結果
+        step += 1
+        raw_results = search_web_with_firefox(query_arg, source_url=default_source)
+        chain_of_thought.append(f"Step {step}: 搜尋結果：" + json.dumps(raw_results))
+        yield {"role": "system", "content": f"Step {step}: 搜尋完成。"}
+        # 使用 summarize_search_sresult 將原始結果與推理過程整合摘要
+        step += 1
+        summary = summarize_search_sresult(
+            {
+                "raw_search_results": raw_results,
+                "chain_of_thought": chain_of_thought,
+            },
+            context="請根據上述資訊生成一個綜合回答。",
+        )
+        chain_of_thought.append(f"Step {step}: 搜尋結果摘要完成。")
+        final_msg = "最終答案：" + summary
+        yield {"role": "assistant", "content": final_msg}
+        return final_msg
 
+    if info["func_name"] == "get_current_time":
+        step += 1
+        chain_of_thought.append(f"Step {step}: 模型返回 function_call，執行 'get_current_time'。")
+        yield {
+            "role": "system",
+            "content": f"Step {step}: 模型返回 function_call，執行取得當前時間功能。",
+        }
+        result = get_current_time()
+        chain_of_thought.append(f"Step {step}: 取得當前時間：{result}")
+        yield {"role": "assistant", "content": f"當前時間：{result}"}
+        return result
+    
     return None
