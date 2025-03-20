@@ -14,7 +14,7 @@
 
 ## 系統架構
 
-``` bash
+``` shell
 project/
 ├── backend/ # 後端服務
 │ ├── main.py # FastAPI 主程序
@@ -39,14 +39,14 @@ project/
    ```
 
 2. 安裝相依套件：
-   ``` bash
+   ``` shell
    pip install -r requirements.txt
    ```
 
 ## 使用方式
 
 ### 啟動後端服務
-``` bash
+``` shell
 python -m backend.main
 ```
 
