@@ -1,10 +1,10 @@
 from openai import AzureOpenAI
-from src.config import ChatModelConfig
+from src.config import ModelConfig
 
-config = ChatModelConfig()
+config = ModelConfig()
 
 
-def init_chat_model_client():
+def init_model_client():
     """
     使用 config 中的參數初始化 AzureOpenAI 客戶端，
     未來如果需要支持其他模型供應商，可在此處擴展。
@@ -18,5 +18,5 @@ def init_chat_model_client():
 
 
 if __name__ == "__main__":
-    client = init_chat_model_client()
+    client = init_model_client()
     print("Model client initialized.")

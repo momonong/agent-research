@@ -1,4 +1,4 @@
-from src.clients.chat_client import init_chat_model_client
+from src.clients.model_client import init_model_client
 
 
 def summarize_search_sresult(info: dict, context: str = "") -> str:
@@ -6,12 +6,12 @@ def summarize_search_sresult(info: dict, context: str = "") -> str:
     將提供的資訊進行摘要整理，返回綜合答案。
 
     參數：
-      - info: 一個字典，包含需要整合的資訊。
-          例如：{"raw_search_results": [...], "chain_of_thought": [...]}
-      - context: 其他附加上下文，用來指導摘要的重點。
+        - info: 一個字典，包含需要整合的資訊。
+            例如：{"raw_search_results": [...], "chain_of_thought": [...]}
+        - context: 其他附加上下文，用來指導摘要的重點。
 
     回傳：
-      - 模型生成的綜合答案。
+        - 模型生成的綜合答案。
     """
     # 將所有資訊整合成一個長文本
     raw_info = "搜尋結果：\n"
@@ -27,7 +27,7 @@ def summarize_search_sresult(info: dict, context: str = "") -> str:
         "最終回答："
     )
 
-    client = init_chat_model_client()
+    client = init_model_client()
     messages = [
         {"role": "system", "content": "你是一個專業的資訊摘要助手。"},
         {"role": "user", "content": prompt},

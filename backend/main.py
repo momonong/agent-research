@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from src.clients.chat_client import init_chat_model_client
+from src.clients.model_client import init_chat_model_client
 from src.agents.agent import Agent
 import asyncio
 import json

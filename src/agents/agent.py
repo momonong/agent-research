@@ -1,6 +1,6 @@
 import json
 import traceback
-from src.clients.chat_client import init_chat_model_client
+from src.clients.model_client import init_model_client
 from src.agents.function_registry import get_function_definitions, handle_function_call
 
 class Agent:
@@ -90,8 +90,8 @@ class Agent:
         return final_messages[-1]["content"]
 
 if __name__ == "__main__":
-    from src.clients.chat_client import init_chat_model_client
-    client = init_chat_model_client()
+    from src.clients.model_client import init_model_client
+    client = init_model_client()
     system_prompt = "你是一個具有內部推理能力的助手。當你無法直接回答問題時，請啟用外部搜尋並將搜尋過程與最終答案展示給使用者。"
     agent = Agent(client, system_prompt=system_prompt, default_source=None)
     

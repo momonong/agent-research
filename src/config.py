@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class ChatModelConfig:
+class ModelConfig:
     def __init__(self):
         self.AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
         self.AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")

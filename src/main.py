@@ -5,11 +5,11 @@ try:
 except Exception as e:
     print("無法重新設定 sys.stdin 編碼：", e)
 
-from src.clients.chat_client import init_chat_model_client
+from src.clients.model_client import init_model_client
 from src.agents.agent import Agent
 
 def main():
-    client = init_chat_model_client()
+    client = init_model_client()
     system_prompt = "你是一個智慧且自信的助手。如果你對問題有充分的資訊，請直接回答；如果你不確定，或者認為需要額外資訊來提供正確回答，請返回一個 function_call 來調用外部搜尋功能。"
     agent = Agent(client, system_prompt=system_prompt, default_source=None)
     
