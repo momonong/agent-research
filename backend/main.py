@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from src.clients.model_client import init_model_client
 from src.agents.agent import Agent
+from backend.chat_request import ChatRequest
 import asyncio
 import json
 
@@ -25,14 +26,13 @@ async def agent_stream(query):
 
 
 @app.post("/chat")
-async def chat(request: Request):
+async def chat(request: ChatRequest):
     """
     處理用戶發送的對話訊息，並返回 Agent 的回應。
     """
-    data = await request.json()
-    query = data.get("query")
+    query = request.query
     if not query:
-        return JSONResponse(content={"error": "請提供 query 參數。"}, status_code=400)
+        return JSONResponse({"error": "請提供 query 參數。"}, status_code=400)
     return StreamingResponse(agent_stream(query), media_type="application/json")
 
 
@@ -44,4 +44,4 @@ async def read_root():
 if __name__ == "__main__":
     import uvicorn
     # 注意這裡根據你的資料夾結構改成 backend.main:app
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=3000, reload=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8051, reload=True)
