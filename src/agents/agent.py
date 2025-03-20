@@ -1,82 +1,92 @@
 import json
 import traceback
 from src.clients.model_client import init_model_client
-from src.agents.function_registry import get_function_definitions, handle_function_call
+from src.agents.reasoning import generate_reasoning, parse_reasoning_text, generate_final_answer
+from src.agents.function_registry import get_function_definitions, handle_function_call, get_function_call_info
+
 
 class Agent:
-    def __init__(self, client, system_prompt="", default_source: str = None):
+    def __init__(self, client, default_source: str = None):
         """
         初始化 Agent，接收外部模型客戶端、系統提示和預設來源（default_source）。
+        """
+        system_prompt = f"""
+        你是一個具有內部推理能力且高效的智慧助手。
+        當你接收到問題後，請先詳細描述你的思考過程，
+        每個步驟請以「<step1>」、「<step2>」、「<step3>」等格式分隔並記錄。
+        請逐步展示這些推理步驟給使用者，
+        然後根據這些步驟生成最終答案。
+        如果你認為你沒有足夠的資訊直接回答問題，
+        請啟用外部搜尋功能以補充資料，
+        再根據搜集到的資訊給出最終答案。
         """
         self.client = client
         self.messages = [{"role": "system", "content": system_prompt}]
         self.default_source = default_source
-        self.chain_of_thought = []  # 用於記錄模型的推理過程（面向使用者顯示）
+        self.reasoning_steps = []  # 用於記錄模型的推理過程（面向使用者顯示）
         if system_prompt:
             self.add_message("system", system_prompt)
 
     def add_message(self, role, content):
         """
-        新增對話訊息，若不是用戶訊息，則同時記錄到 chain_of_thought 中，
+        新增對話訊息，若不是用戶訊息，則同時記錄到 reasoning_steps 中，
         這裡我們希望呈現給使用者的「思考過程」是比較自然的描述，而非內部調試細節。
         """
         self.messages.append({"role": role, "content": content})
         # 對於非用戶訊息，我們將其記錄下來，但可以過濾或轉換後再記錄
         if role != "user":
-            self.chain_of_thought.append(content)
+            self.reasoning_steps.append(content)
 
     def chat_stream(self, user_input):
-        # 清空之前的推理記錄
-        self.chain_of_thought = []
-        step = 0
+        # 清空之前的推理紀錄
+        self.reasoning_steps = []
         self.add_message("user", user_input)
         yield {"role": "user", "content": user_input}
 
-        # 收到使用者輸入
-        step += 1
-        self.chain_of_thought.append(f"Step {step}: 收到使用者輸入。")
-        yield {"role": "system", "content": f"Step {step}: 收到使用者輸入。"}
-
-        # 載入 function 定義
-        step += 1
+        # 先呼叫（包含 function definitions），讓模型判斷是否需要外部功能調用
         functions = get_function_definitions()
-        self.chain_of_thought.append(f"Step {step}: 載入 function 定義：" + json.dumps(functions))
-        yield {"role": "system", "content": f"Step {step}: 載入 function 定義。"}
 
-        try:
-            # 呼叫模型 API，讓模型決定是否需要調用 function
-            response = self.client.chat.completions.create(
-                model="gpt-4o",  # 根據你的部署名稱調整
-                messages=self.messages,
-                functions=functions,
-                function_call="auto",
-                temperature=0.7,
-            )
-            step += 1
-            self.chain_of_thought.append(f"Step {step}: 模型回應完成。")
-            yield {"role": "system", "content": f"Step {step}: 模型回應完成。"}
+        # Step 1: 調用模型生成推理過程
+        raw_reasoning = generate_reasoning(self.client, user_input, functions)
+        steps = parse_reasoning_text(raw_reasoning)
+        for step in steps:
+            self.reasoning_steps.append(step)
+            yield {"role": "system", "content": step}
 
-            # 使用 handle_function_call 處理 function_call 相關流程
-            result = yield from handle_function_call(step, response, self.chain_of_thought, self.default_source)
-            if result:
-                self.add_message("assistant", result)
+        # Step 2: 使用整個推理過程生成最終答案
+        full_reasoning = "\n".join(steps)
+        response = self.client.chat.completions.create(
+            model="gpt-4o",
+            messages=self.messages,
+            functions=functions,
+            function_call="auto",
+            temperature=0.7,
+        )
+
+        # 檢查模型回應是否包含 function_call
+        info = get_function_call_info(response)
+        if info:
+            # 如果有 function call，使用 handle_function_call 處理並 yield 其結果
+            final_result = yield from handle_function_call(response, self.reasoning_steps, self.default_source)
+            if final_result:
+                self.add_message("assistant", final_result)
+                yield {"role": "assistant", "content": final_result}
                 return
 
-            # 如果沒有 function_call，則直接使用模型生成的答案
-            step += 1
-            content = response.choices[0].message.content
-            if content:
-                answer = content.strip()
-                self.chain_of_thought.append(F"Step {step}: 模型直接生成回答：" + answer)
-                yield {"role": "assistant", "content": answer}
-                self.add_message("assistant", answer)
-                yield {"role": "system", "content": "最終答案：" + answer}
-            else:
-                yield {"role": "assistant", "content": "模型未返回任何答案。"}
-        except Exception as e:
-            traceback.print_exc()
-            yield {"role": "assistant", "content": "處理時發生錯誤：" + str(e)}
+        # 如果沒有 function_call，則直接使用模型生成的答案
+        content = response.choices[0].message.content.strip()
+        if content:
+            answer = content.strip()
+            self.reasoning_steps.append(f"模型直接生成回答：{answer}")
+            yield {"role": "assistant", "content": answer}
+            self.add_message("assistant", answer)
+            yield {"role": "system", "content": f"最終答案：{answer}"}
+        else:
+            yield {"role": "assistant", "content": "模型未返回任何答案。"}
 
+        # 也可以選擇將整個推理過程作為上下文，再生成一個最終答案：
+        final_answer = generate_final_answer(self.client, user_input, full_reasoning)
+        yield {"role": "assistant", "content": final_answer}
 
     def chat(self, user_input):
         """
@@ -85,7 +95,7 @@ class Agent:
         """
         final_messages = []
         for message in self.chat_stream(user_input):
-            print(message)  # 除錯時印出
+            # print(message)  # 除錯時印出
             final_messages.append(message)
         return final_messages[-1]["content"]
 

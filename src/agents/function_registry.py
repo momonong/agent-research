@@ -1,7 +1,7 @@
 import json
 from src.functions.web_search import search_web_with_firefox
-from src.functions.get_current_time import get_current_time
-from src.functions.summarize_result import summarize_search_sresult
+from src.tools.get_current_time import get_current_time
+from src.functions.summarize_result import summarize_result
 
 
 def get_function_definitions() -> list:
@@ -46,10 +46,12 @@ def get_function_call_info(response) -> dict:
     return {"func_name": func_name, "arguments": arguments}
 
 
-def handle_function_call(step, response, chain_of_thought, default_source: str = None):
+def handle_function_call(response, reasoning, default_source: str = None):
     """
     處理模型返回的 function_call 回應：
-    如果函數名稱為 "search_website"，則調用 search_web_with_firefox 並返回結果。
+      - 如果函數名稱為 "search_website"，則調用 search_web_with_firefox 並利用 summarize_result 整合結果；
+      - 如果函數名稱為 "get_current_time"，則調用 get_current_time 返回當前時間。
+    以生成器方式逐步 yield 處理訊息，最終返回結果。
     """
     info = get_function_call_info(response)
     if not info:
@@ -57,45 +59,46 @@ def handle_function_call(step, response, chain_of_thought, default_source: str =
 
     # 處理搜尋功能
     if info["func_name"] == "search_website":
-        step += 1
-        chain_of_thought.append(
-            f"Step {step}: 模型返回 function_call，準備執行 'search_website'，參數："
+        reasoning.append(
+            f"模型返回 function_call，準備執行 'search_website'，參數："
             + json.dumps(info["arguments"])
         )
         yield {
             "role": "system",
-            "content": f"Step {step}: 模型返回 function_call，執行搜尋功能。",
+            "content": f"模型返回 function_call，進行網路搜尋。",
         }
         query_arg = info["arguments"].get("query", "")
         # 呼叫搜尋函數取得原始結果
-        step += 1
         raw_results = search_web_with_firefox(query_arg, source_url=default_source)
-        chain_of_thought.append(f"Step {step}: 搜尋結果：" + json.dumps(raw_results))
-        yield {"role": "system", "content": f"Step {step}: 搜尋完成。"}
+        reasoning.append(f"搜尋結果：" + json.dumps(raw_results))
+        yield {"role": "system", "content": f"網路搜尋完成。"}
         # 使用 summarize_search_sresult 將原始結果與推理過程整合摘要
-        step += 1
-        summary = summarize_search_sresult(
+        summary = summarize_result(
             {
                 "raw_search_results": raw_results,
-                "chain_of_thought": chain_of_thought,
+                "reasoning": reasoning,
             },
-            context="請根據上述資訊生成一個綜合回答。",
         )
-        chain_of_thought.append(f"Step {step}: 搜尋結果摘要完成。")
+        reasoning.append(f"將搜尋結果進行統整。")
         final_msg = "最終答案：" + summary
         yield {"role": "assistant", "content": final_msg}
         return final_msg
 
     if info["func_name"] == "get_current_time":
-        step += 1
-        chain_of_thought.append(f"Step {step}: 模型返回 function_call，執行 'get_current_time'。")
+        reasoning.append(f"模型返回 function_call，執行 'get_current_time'。")
         yield {
             "role": "system",
-            "content": f"Step {step}: 模型返回 function_call，執行取得當前時間功能。",
+            "content": f"模型返回 function_call，取得當前時間。",
         }
-        result = get_current_time()
-        chain_of_thought.append(f"Step {step}: 取得當前時間：{result}")
-        yield {"role": "assistant", "content": f"當前時間：{result}"}
-        return result
+        current_time = get_current_time()
+        summary = summarize_result(
+            {
+                "current_time": current_time,
+                "reasoning": reasoning,
+            },
+        )
+        reasoning.append(f"{summary}")
+        yield {"role": "assistant", "content": f"{summary}"}
+        return summary
     
     return None
