@@ -36,6 +36,29 @@ async def chat(request: ChatRequest):
     return StreamingResponse(agent_stream(query), media_type="application/json")
 
 
+@app.get("/test")
+async def test_stream():
+    async def fake_stream():
+        # 模擬幾個步驟的訊息
+        simulated_messages = [
+            {"role": "user", "content": "測試用戶訊息"},
+            {"role": "system", "content": "Step 1: 收到使用者輸入。"},
+            {"role": "system", "content": "Step 2: 正在處理請求..."},
+            {"role": "assistant", "content": "這是中間回覆..."},
+            {
+                "role": "assistant",
+                "content": "最終答案：這是最終回覆。",
+                "finalized": True,
+            },
+        ]
+        for msg in simulated_messages:
+            # 將每個訊息轉成 JSON 字串並換行分隔
+            yield json.dumps(msg) + "\n"
+            await asyncio.sleep(0.5)  # 模擬延遲
+
+    return StreamingResponse(fake_stream(), media_type="application/json")
+
+
 @app.get("/")
 async def read_root():
     return {"message": "歡迎使用 Agent 聊天系統！請使用 POST 請求 /chat 端點。"}
@@ -43,5 +66,6 @@ async def read_root():
 
 if __name__ == "__main__":
     import uvicorn
+
     # 注意這裡根據你的資料夾結構改成 backend.main:app
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8051, reload=True)
