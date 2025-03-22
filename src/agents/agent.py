@@ -46,12 +46,12 @@ class Agent:
         if role != "user":
             self.reasoning_steps.append(content)
 
-    def chat_stream(self, user_input):
+    async def chat_stream(self, user_input):
         logging.debug("開始 chat_stream, user_input: %s", user_input)
         # 清空之前的推理紀錄
         self.reasoning_steps = []
         self.add_message("user", user_input)
-        yield {"role": "user", "content": user_input}
+        yield {"message": user_input, "finalized": False}
         logging.debug("已 yield user 訊息")
 
         # Step 1: 調用模型生成推理過程
@@ -62,9 +62,11 @@ class Agent:
         steps = parse_reasoning_text(raw_reasoning)
         logging.debug("解析後的 steps: %s", steps)
         for step in steps:
+            if not step.strip():  # 跳過空消息
+                continue
             self.reasoning_steps.append(step)
             logging.debug("yield 推理步驟: %s", step)
-            yield {"role": "system", "content": step}
+            yield {"reasoning": [step], "finalized": False}
 
         # Step 2: 使用整個推理過程生成最終答案
         full_reasoning = "\n".join(steps)
@@ -83,14 +85,10 @@ class Agent:
         logging.debug("function call info: %s", info)
         if info:
             logging.debug("進入 function call 處理")
-            final_result = yield from handle_function_call(
-                response, self.reasoning_steps, self.default_source
-            )
-            logging.debug("function call 處理結果: %s", final_result)
-            if final_result:
-                self.add_message("assistant", final_result)
-                yield {"role": "assistant", "content": final_result}
-                return
+            # 遍歷 handle_function_call 的所有 yield
+            async for item in handle_function_call(response, self.reasoning_steps, self.default_source):
+                yield item
+            return
 
         # 如果沒有 function_call，則直接使用模型生成的答案
         content = response.choices[0].message.content.strip()
@@ -99,28 +97,30 @@ class Agent:
             answer = content.strip()
             self.reasoning_steps.append(f"模型直接生成回答：{answer}")
             logging.debug("yield assistant answer: %s", answer)
-            yield {"role": "assistant", "content": answer}
             self.add_message("assistant", answer)
-            yield {"role": "system", "content": f"最終答案：{answer}"}
         else:
             logging.debug("模型未返回答案")
-            yield {"role": "assistant", "content": "模型未返回任何答案。"}
 
         # 也可以選擇將整個推理過程作為上下文，再生成一個最終答案：
+        # 在 yield 最終答案之前進行去重
         final_answer = generate_final_answer(self.client, user_input, full_reasoning)
         logging.debug("生成第二個最終答案: %s", final_answer)
-        yield {"role": "assistant", "content": final_answer}
+        yield {
+            "message": final_answer,
+            "reasoning": self.reasoning_steps,
+            "finalized": True,
+        }
+        logging.debug("chat_stream 完成")
 
-    def chat(self, user_input):
+    async def chat(self, user_input):
         """
         封裝 chat_stream，並將所有生成的訊息合併為最終答案，
         這裡僅用於測試。實際上，您可能會通過 WebSocket 或 SSE 來流式傳輸。
         """
         final_messages = []
-        for message in self.chat_stream(user_input):
-            # print(message)  # 除錯時印出
-            final_messages.append(message)
-        return final_messages[-1]["content"]
+        async for msg in self.chat_stream(user_input):
+            final_messages.append(msg)
+        return final_messages[-1]["message"]
 
 
 if __name__ == "__main__":

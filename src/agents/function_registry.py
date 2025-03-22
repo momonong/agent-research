@@ -3,7 +3,6 @@ from src.functions.web_search import search_web_with_firefox
 from src.tools.get_current_time import get_current_time
 from src.functions.summarize_result import summarize_result
 
-
 def get_function_definitions() -> list:
     """
     根據 query 返回可用的函數定義列表。
@@ -35,18 +34,18 @@ def get_function_call_info(response) -> dict:
     從模型返回的 response 中提取 function_call 的相關資訊。
     """
     if response.choices[0].finish_reason != "function_call":
-        return None
+        return 
 
     function_call = response.choices[0].message.function_call
     if not function_call:
-        return None
+        return 
 
     func_name = function_call.name
     arguments = json.loads(function_call.arguments)
     return {"func_name": func_name, "arguments": arguments}
 
 
-def handle_function_call(response, reasoning, default_source: str = None):
+async def handle_function_call(response, reasoning, default_source: str = None):
     """
     處理模型返回的 function_call 回應：
       - 如果函數名稱為 "search_website"，則調用 search_web_with_firefox 並利用 summarize_result 整合結果；
@@ -55,23 +54,28 @@ def handle_function_call(response, reasoning, default_source: str = None):
     """
     info = get_function_call_info(response)
     if not info:
-        return None
+        return
 
     # 處理搜尋功能
     if info["func_name"] == "search_website":
         reasoning.append(
             f"模型返回 function_call，準備執行 'search_website'，參數："
-            + json.dumps(info["arguments"])
+            + json.dumps(info["arguments"], ensure_ascii=False)
         )
         yield {
-            "role": "system",
-            "content": f"模型返回 function_call，進行網路搜尋。",
+            "message": f"模型返回 function_call，進行網路搜尋。",
+            "finalized": False,
+            "reasoning": reasoning.copy()  # 複製一份當前推理過程
         }
         query_arg = info["arguments"].get("query", "")
         # 呼叫搜尋函數取得原始結果
-        raw_results = search_web_with_firefox(query_arg, source_url=default_source)
-        reasoning.append(f"搜尋結果：" + json.dumps(raw_results))
-        yield {"role": "system", "content": f"網路搜尋完成。"}
+        raw_results = await search_web_with_firefox(query_arg, source_url=default_source)
+        reasoning.append(f"搜尋結果：" + json.dumps(raw_results, ensure_ascii=False))
+        yield {
+            "message": f"網路搜尋完成。",
+            "finalized": False,
+            "reasoning": reasoning.copy()
+        }
         # 使用 summarize_search_sresult 將原始結果與推理過程整合摘要
         summary = summarize_result(
             {
@@ -80,15 +84,19 @@ def handle_function_call(response, reasoning, default_source: str = None):
             },
         )
         reasoning.append(f"將搜尋結果進行統整。")
-        final_msg = "最終答案：" + summary
-        yield {"role": "assistant", "content": final_msg}
-        return final_msg
+        yield {
+            "message": summary,
+            "finalized": True,
+            "reasoning": reasoning.copy()  # 傳回完整的推理過程
+        }
+        return 
 
     if info["func_name"] == "get_current_time":
         reasoning.append(f"模型返回 function_call，執行 'get_current_time'。")
         yield {
-            "role": "system",
-            "content": f"模型返回 function_call，取得當前時間。",
+            "message": "模型返回 function_call，取得當前時間。",
+            "finalized": False,
+            "reasoning": reasoning.copy()
         }
         current_time = get_current_time()
         summary = summarize_result(
@@ -98,7 +106,11 @@ def handle_function_call(response, reasoning, default_source: str = None):
             },
         )
         reasoning.append(f"{summary}")
-        yield {"role": "assistant", "content": f"{summary}"}
-        return summary
+        yield {
+            "message": f"{summary}",
+            "finalized": True,
+            "reasoning": reasoning.copy()
+        }
+        return 
     
-    return None
+    return

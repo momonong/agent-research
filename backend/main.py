@@ -13,6 +13,7 @@ app = FastAPI()
 # 設定允許的來源，這裡只允許 localhost:3000，或者你也可以使用 "*" 允許所有
 origins = [
     "http://localhost:3000",
+    "ming60.tplinkdns.com",
 ]
 
 app.add_middleware(
@@ -42,9 +43,14 @@ async def chat(request: ChatRequest):
     處理用戶發送的對話訊息，並返回 Agent 的回應。
     """
     query = request.query
-    if not query:
-        return JSONResponse({"error": "請提供 query 參數。"}, status_code=400)
-    return StreamingResponse(agent_stream(query), media_type="application/json")
+    logger.info(f"收到對話請求，query: {query}")
+    
+    response = StreamingResponse(agent_stream(query), media_type="application/json")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+
+    logger.info("開始串流回應")
+    return response
 
 
 @app.post("/api/test")
