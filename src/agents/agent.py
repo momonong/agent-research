@@ -44,14 +44,18 @@ class Agent:
         self.messages.append({"role": role, "content": content})
         # 對於非用戶訊息，我們將其記錄下來，但可以過濾或轉換後再記錄
         if role != "user":
-            self.reasoning_steps.append(content)
+            # 如果已存在相同內容就不重複加入
+            if content not in self.reasoning_steps:
+                self.reasoning_steps.append(content)
+            else:
+                logging.debug("add_message: 重複內容已存在，不再加入: %s", content)
 
     async def chat_stream(self, user_input):
         logging.debug("開始 chat_stream, user_input: %s", user_input)
         # 清空之前的推理紀錄
         self.reasoning_steps = []
         self.add_message("user", user_input)
-        yield {"message": user_input, "finalized": False}
+        yield {"message": user_input, "finalized": False, "source": "UserInput"}
         logging.debug("已 yield user 訊息")
 
         # Step 1: 調用模型生成推理過程
@@ -66,7 +70,7 @@ class Agent:
                 continue
             self.reasoning_steps.append(step)
             logging.debug("yield 推理步驟: %s", step)
-            yield {"reasoning": [step], "finalized": False}
+            yield {"reasoning": [step], "finalized": False, "source": "ReasoningStep"}
 
         # Step 2: 使用整個推理過程生成最終答案
         full_reasoning = "\n".join(steps)
@@ -86,7 +90,10 @@ class Agent:
         if info:
             logging.debug("進入 function call 處理")
             # 遍歷 handle_function_call 的所有 yield
-            async for item in handle_function_call(response, self.reasoning_steps, self.default_source):
+            async for item in handle_function_call(
+                response, self.reasoning_steps, self.default_source
+            ):
+                item["source"] = "FunctionCall"
                 yield item
             return
 
@@ -98,6 +105,7 @@ class Agent:
             self.reasoning_steps.append(f"模型直接生成回答：{answer}")
             logging.debug("yield assistant answer: %s", answer)
             self.add_message("assistant", answer)
+            yield {"message": answer, "finalized": False, "source": "AssitatntAnswer"}
         else:
             logging.debug("模型未返回答案")
 
@@ -109,6 +117,7 @@ class Agent:
             "message": final_answer,
             "reasoning": self.reasoning_steps,
             "finalized": True,
+            "source": "FinalAnswer",
         }
         logging.debug("chat_stream 完成")
 
