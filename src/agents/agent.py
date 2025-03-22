@@ -44,11 +44,7 @@ class Agent:
         self.messages.append({"role": role, "content": content})
         # 對於非用戶訊息，我們將其記錄下來，但可以過濾或轉換後再記錄
         if role != "user":
-            # 如果已存在相同內容就不重複加入
-            if content not in self.reasoning_steps:
-                self.reasoning_steps.append(content)
-            else:
-                logging.debug("add_message: 重複內容已存在，不再加入: %s", content)
+            self.reasoning_steps.append(content)
 
     async def chat_stream(self, user_input):
         logging.debug("開始 chat_stream, user_input: %s", user_input)
@@ -69,7 +65,7 @@ class Agent:
             if not step.strip():  # 跳過空消息
                 continue
             self.reasoning_steps.append(step)
-            logging.debug("yield 推理步驟: %s", step)
+            logging.debug("yield 推理步驟: %s", step[-1])
             yield {"reasoning": [step], "finalized": False, "source": "ReasoningStep"}
 
         # Step 2: 使用整個推理過程生成最終答案

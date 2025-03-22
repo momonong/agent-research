@@ -66,7 +66,7 @@ async def handle_function_call(response, reasoning, default_source: str = None):
         yield {
             "message": f"模型返回 function_call，進行網路搜尋。",
             "finalized": False,
-            "reasoning": reasoning.copy(),  # 複製一份當前推理過程
+            "reasoning": [reasoning.copy()[-1]],  # 複製一份當前推理過程
             "source": "search_website1",
         }
         query_arg = info["arguments"].get("query", "")
@@ -76,7 +76,7 @@ async def handle_function_call(response, reasoning, default_source: str = None):
         yield {
             "message": f"網路搜尋完成。",
             "finalized": False,
-            "reasoning": reasoning.copy(),
+            "reasoning": [reasoning.copy()[-1]],
             "source": "search_website2",
         }
         # 使用 summarize_search_sresult 將原始結果與推理過程整合摘要
@@ -90,7 +90,7 @@ async def handle_function_call(response, reasoning, default_source: str = None):
         yield {
             "message": summary,
             "finalized": True,
-            "reasoning": reasoning.copy(),  # 傳回完整的推理過程
+            "reasoning": [reasoning.copy()[-1]],  # 傳回完整的推理過程
             "source": "search_website3",
         }
         return 
@@ -100,7 +100,7 @@ async def handle_function_call(response, reasoning, default_source: str = None):
         yield {
             "message": "模型返回 function_call，取得當前時間。",
             "finalized": False,
-            "reasoning": reasoning.copy(),
+            "reasoning": [reasoning.copy()[-1]],
             "source": "get_current_time1",
         }
         current_time = get_current_time()
@@ -114,7 +114,7 @@ async def handle_function_call(response, reasoning, default_source: str = None):
         yield {
             "message": f"{summary}",
             "finalized": True,
-            "reasoning": reasoning.copy(),
+            "reasoning": [reasoning.copy()[-1]],
             "source": "get_current_time2",
         }
         return 
