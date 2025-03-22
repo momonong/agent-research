@@ -1,7 +1,7 @@
 # tests/test_function_calling.py
 import json
 import unittest
-from src.clients.functions.database_query import query_database, handle_function_call
+from src.functions.database_query import query_database, handle_function_call
 
 class FakeChoice:
     def __init__(self, finish_reason, message):

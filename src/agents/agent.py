@@ -1,8 +1,17 @@
-import json
-import traceback
+import logging
 from src.clients.model_client import init_model_client
-from src.agents.reasoning import generate_reasoning, parse_reasoning_text, generate_final_answer
-from src.agents.function_registry import get_function_definitions, handle_function_call, get_function_call_info
+from src.agents.reasoning import (
+    generate_reasoning,
+    parse_reasoning_text,
+    generate_final_answer,
+)
+from src.agents.function_registry import (
+    get_function_definitions,
+    handle_function_call,
+    get_function_call_info,
+)
+
+logging.basicConfig(level=logging.DEBUG)  # 或設定到合適的等級
 
 
 class Agent:
@@ -38,23 +47,28 @@ class Agent:
             self.reasoning_steps.append(content)
 
     def chat_stream(self, user_input):
+        logging.debug("開始 chat_stream, user_input: %s", user_input)
         # 清空之前的推理紀錄
         self.reasoning_steps = []
         self.add_message("user", user_input)
         yield {"role": "user", "content": user_input}
-
-        # 先呼叫（包含 function definitions），讓模型判斷是否需要外部功能調用
-        functions = get_function_definitions()
+        logging.debug("已 yield user 訊息")
 
         # Step 1: 調用模型生成推理過程
+        functions = get_function_definitions()
+        logging.debug("開始生成推理過程, functions: %s", functions)
         raw_reasoning = generate_reasoning(self.client, user_input, functions)
+        logging.debug("raw_reasoning: %s", raw_reasoning)
         steps = parse_reasoning_text(raw_reasoning)
+        logging.debug("解析後的 steps: %s", steps)
         for step in steps:
             self.reasoning_steps.append(step)
+            logging.debug("yield 推理步驟: %s", step)
             yield {"role": "system", "content": step}
 
         # Step 2: 使用整個推理過程生成最終答案
         full_reasoning = "\n".join(steps)
+        logging.debug("開始生成最終答案，full_reasoning: %s", full_reasoning)
         response = self.client.chat.completions.create(
             model="gpt-4o",
             messages=self.messages,
@@ -62,12 +76,17 @@ class Agent:
             function_call="auto",
             temperature=0.7,
         )
+        logging.debug("模型回應 response: %s", response)
 
         # 檢查模型回應是否包含 function_call
         info = get_function_call_info(response)
+        logging.debug("function call info: %s", info)
         if info:
-            # 如果有 function call，使用 handle_function_call 處理並 yield 其結果
-            final_result = yield from handle_function_call(response, self.reasoning_steps, self.default_source)
+            logging.debug("進入 function call 處理")
+            final_result = yield from handle_function_call(
+                response, self.reasoning_steps, self.default_source
+            )
+            logging.debug("function call 處理結果: %s", final_result)
             if final_result:
                 self.add_message("assistant", final_result)
                 yield {"role": "assistant", "content": final_result}
@@ -75,17 +94,21 @@ class Agent:
 
         # 如果沒有 function_call，則直接使用模型生成的答案
         content = response.choices[0].message.content.strip()
+        logging.debug("直接生成的答案 content: %s", content)
         if content:
             answer = content.strip()
             self.reasoning_steps.append(f"模型直接生成回答：{answer}")
+            logging.debug("yield assistant answer: %s", answer)
             yield {"role": "assistant", "content": answer}
             self.add_message("assistant", answer)
             yield {"role": "system", "content": f"最終答案：{answer}"}
         else:
+            logging.debug("模型未返回答案")
             yield {"role": "assistant", "content": "模型未返回任何答案。"}
 
         # 也可以選擇將整個推理過程作為上下文，再生成一個最終答案：
         final_answer = generate_final_answer(self.client, user_input, full_reasoning)
+        logging.debug("生成第二個最終答案: %s", final_answer)
         yield {"role": "assistant", "content": final_answer}
 
     def chat(self, user_input):
@@ -99,12 +122,14 @@ class Agent:
             final_messages.append(message)
         return final_messages[-1]["content"]
 
+
 if __name__ == "__main__":
     from src.clients.model_client import init_model_client
+
     client = init_model_client()
     system_prompt = "你是一個具有內部推理能力的助手。當你無法直接回答問題時，請啟用外部搜尋並將搜尋過程與最終答案展示給使用者。"
     agent = Agent(client, system_prompt=system_prompt, default_source=None)
-    
+
     user_input = "請問最新的人工智慧新聞有哪些？"
     print("用戶:", user_input)
     for message in agent.chat_stream(user_input):
