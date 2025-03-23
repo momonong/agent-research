@@ -71,6 +71,7 @@ class Agent:
         # Step 2: 使用整個推理過程生成最終答案
         full_reasoning = "\n".join(steps)
         logging.debug("開始生成最終答案，full_reasoning: %s", full_reasoning)
+        self.add_message("system", f"這是你可以參考的推理步驟: {full_reasoning}，生成不包含推理步驟的最終答案。")
         response = self.client.chat.completions.create(
             model="gpt-4o",
             messages=self.messages,
@@ -85,7 +86,6 @@ class Agent:
         logging.debug("function call info: %s", info)
         if info:
             logging.debug("進入 function call 處理")
-            # 遍歷 handle_function_call 的所有 yield
             async for item in handle_function_call(
                 response, self.reasoning_steps, self.default_source
             ):
@@ -98,24 +98,13 @@ class Agent:
         logging.debug("直接生成的答案 content: %s", content)
         if content:
             answer = content.strip()
-            self.reasoning_steps.append(f"模型直接生成回答：{answer}")
             logging.debug("yield assistant answer: %s", answer)
             self.add_message("assistant", answer)
-            yield {"message": answer, "finalized": False, "source": "AssitatntAnswer"}
+            yield {"message": answer, "finalized": True, "source": "AssistantAnswer"}
         else:
             logging.debug("模型未返回答案")
+            yield {"message": "模型未返回任何答案", "finalized": True, "source": "AssistantAnswer"}
 
-        # 也可以選擇將整個推理過程作為上下文，再生成一個最終答案：
-        # 在 yield 最終答案之前進行去重
-        final_answer = generate_final_answer(self.client, user_input, full_reasoning)
-        logging.debug("生成第二個最終答案: %s", final_answer)
-        yield {
-            "message": final_answer,
-            "reasoning": self.reasoning_steps,
-            "finalized": True,
-            "source": "FinalAnswer",
-        }
-        logging.debug("chat_stream 完成")
 
     async def chat(self, user_input):
         """

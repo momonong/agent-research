@@ -1,11 +1,10 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from backend.agent_stream import agent_stream
 from backend.chat_request import ChatRequest
 from test.fake_stream import fake_stream
-import asyncio
-import json
+
 import logging
 
 app = FastAPI()
@@ -13,7 +12,7 @@ app = FastAPI()
 # 設定允許的來源，這裡只允許 localhost:3000，或者你也可以使用 "*" 允許所有
 origins = [
     "http://localhost:3000",
-    "ming60.tplinkdns.com",
+    "https://ming60.tplinkdns.com",
 ]
 
 app.add_middleware(
@@ -24,17 +23,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 配置日誌
-logging.basicConfig(level=logging.INFO, 
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 # 只允許來自 localhost 的連線
 @app.middleware("http")
 async def ip_restriction_middleware(request: Request, call_next):
-    if request.client.host not in ("127.0.0.1", "::1"):
+    # 如果請求有 X-Internal-Call 標記，直接允許
+    if request.headers.get("X-Internal-Call") == "true":
+        return await call_next(request)
+    # 從 header 取得代理過來的 IP，如果沒有則使用 request.client.host
+    forwarded = request.headers.get("X-Forwarded-For")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else request.client.host
+    if client_ip not in ("127.0.0.1", "::1"):
         raise HTTPException(status_code=403, detail="Access forbidden")
     return await call_next(request)
+
+
+# 配置日誌
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 @app.post("/api/chat")
@@ -44,7 +52,7 @@ async def chat(request: ChatRequest):
     """
     query = request.query
     logger.info(f"收到對話請求，query: {query}")
-    
+
     response = StreamingResponse(agent_stream(query), media_type="application/json")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["Connection"] = "keep-alive"
@@ -64,14 +72,14 @@ async def test_stream(request: ChatRequest):
     try:
         query = request.query
         logger.info(f"收到測試請求，query: {query}")
-        
+
         response = StreamingResponse(fake_stream(query), media_type="application/json")
         response.headers["Cache-Control"] = "no-cache"
         response.headers["Connection"] = "keep-alive"
-        
+
         logger.info("開始串流回應")
         return response
-        
+
     except Exception as e:
         logger.error(f"處理測試請求時發生錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
