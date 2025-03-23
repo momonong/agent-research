@@ -70,7 +70,7 @@ class Agent:
         # Step 2: 使用整個推理過程生成最終答案
         full_reasoning = "\n".join(steps)
         logging.debug("開始生成最終答案，full_reasoning: %s", full_reasoning)
-        self.add_message("system", f"這是你可以參考的推理步驟: {full_reasoning}，生成不包含推理步驟的最終答案。")
+        self.add_message("system", f"這是你可以參考的推理步驟: {full_reasoning}，生成不包含推理步驟的最終答案。並在回答時使用 markdown 語法進行美化排版。")
         response = self.client.chat.completions.create(
             model="gpt-4o",
             messages=self.messages,
