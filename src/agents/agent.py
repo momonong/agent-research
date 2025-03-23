@@ -3,7 +3,6 @@ from src.clients.model_client import init_model_client
 from src.agents.reasoning import (
     generate_reasoning,
     parse_reasoning_text,
-    generate_final_answer,
 )
 from src.agents.function_registry import (
     get_function_definitions,

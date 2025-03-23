@@ -54,22 +54,3 @@ def parse_reasoning_text(raw_reasoning: str) -> list:
     else:
         steps.append(raw_reasoning)
     return steps
-
-
-def generate_final_answer(client, query: str, steps: str) -> str:
-    """
-    將完整的推理過程作為上下文生成最終答案。
-    """
-    prompt = f"""
-        根據以下推理過程，請給出問題「{query}」的最終答案：\n
-        {steps}\n
-        最終答案：
-    """
-    messages = [{"role": "system", "content": prompt}]
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-        temperature=0.7,
-    )
-    answer = response.choices[0].message.content.strip()
-    return answer
