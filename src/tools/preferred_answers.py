@@ -14,7 +14,7 @@ def load_google_sheet():
     return data
 
 
-def get_preferred_answer(query, google_sheet, threshold=40):
+def get_preferred_answer(query, google_sheet=load_google_sheet(), threshold=40):
     """
     根據 query 在 preferred_answers 中進行模糊匹配，返回最合適的預設回答。
 
