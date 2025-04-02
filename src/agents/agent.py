@@ -27,6 +27,8 @@ class Agent:
         如果你認為你沒有足夠的資訊直接回答問題，
         請啟用外部搜尋功能以補充資料，
         再根據搜集到的資訊給出最終答案。
+        請直接推理出最終答案，不要求使用者提供更多資訊。
+        也不要詢問是否需要外部搜尋，直接啟用搜尋功能。
         """
         self.client = client
         self.messages = [{"role": "system", "content": system_prompt}]
