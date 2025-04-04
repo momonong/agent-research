@@ -23,7 +23,7 @@ def get_function_definitions() -> list:
         },
         {
             "name": "get_current_time",
-            "description": "返回當前系統時間。",
+            "description": "回傳現在時間。若使用者問到「最近、現在」等等需要取得當下時間的指令時可以呼叫。",
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     ]
